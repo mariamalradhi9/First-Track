@@ -1,0 +1,388 @@
+// FirstTrack IMS — inferred schema (see /Users/mac/.claude/plans/effervescent-wiggling-mccarthy.md)
+// Draft pending real DB info from the client. Field names/types are best-effort
+// reconstructions from FirstTrack Application Process Flow.docx + the user manual.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Identity / org structure
+// ============================================================
+
+enum Role {
+  HR
+  HOD
+  MENTOR
+  INTERN
+  CEO
+  SUPER_ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  cprId        String   @unique // login username
+  email        String?  @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role
+  departmentId String?
+  department   Department? @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  hodOfDepartment      Department?          @relation("DepartmentHod")
+  internProfile        Intern?              @relation("InternUser")
+  mentoredInterns       Intern[]            @relation("InternMentor")
+  hodForInterns         Intern[]            @relation("InternHod")
+  decidedApplications   ShortlistApplication[] @relation("ApplicationDecidedBy")
+  createdApplications   ShortlistApplication[] @relation("ApplicationCreatedBy")
+  uploadedResources      TrainingResource[]  @relation("ResourceUploadedBy")
+  uploadedFiles          FileAsset[]         @relation("FileUploadedBy")
+  notifications           Notification[]
+  biweeklyReviewsGiven     BiweeklyReview[]   @relation("ReviewBySupervisor")
+  finalRemarksGiven         FinalRemark[]     @relation("RemarkBySupervisor")
+  certificatesIssued         Certificate[]    @relation("CertifiedByHr")
+  statusChanges                InternStatusHistory[] @relation("StatusChangedBy")
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  nameEn    String
+  nameAr    String
+  hodUserId String?  @unique
+  hod       User?    @relation("DepartmentHod", fields: [hodUserId], references: [id])
+  createdAt DateTime @default(now())
+
+  users            User[]              @relation("DepartmentUsers")
+  applications     ShortlistApplication[]
+  interns          Intern[]
+  trainingTopics   TrainingTopic[]
+  trainingResources TrainingResource[]
+}
+
+model Nationality {
+  id     String @id @default(cuid())
+  nameEn String
+  nameAr String
+  interns Intern[]
+}
+
+model TrainingTopic {
+  id           String     @id @default(cuid())
+  nameEn       String
+  nameAr       String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+}
+
+// ============================================================
+// Application / shortlist flow
+// ============================================================
+
+enum ApplicationStatus {
+  SHORTLISTED
+  HOD_APPROVED
+  HOD_REJECTED
+  RECOMMENDED_OTHER_DEPT
+  UNIVERSITY_CONFIRMED
+}
+
+enum InternshipType {
+  OFFLINE
+  ONLINE
+}
+
+model ShortlistApplication {
+  id                   String   @id @default(cuid())
+  applicantName        String
+  sourceDivision       String?  // external division / ministry
+  trainingPeriodStart  DateTime?
+  trainingPeriodEnd    DateTime?
+  type                 InternshipType @default(OFFLINE)
+  cvFileId             String?
+  cvFile               FileAsset? @relation(fields: [cvFileId], references: [id])
+  interestedDepartmentId String
+  interestedDepartment Department @relation(fields: [interestedDepartmentId], references: [id])
+  status               ApplicationStatus @default(SHORTLISTED)
+  interviewRemarks     String?
+  decidedByUserId      String?
+  decidedBy            User?    @relation("ApplicationDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt            DateTime?
+  createdByUserId      String
+  createdBy            User     @relation("ApplicationCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  intern Intern?
+}
+
+enum InternStatus {
+  REGISTERED
+  ACTIVE
+  COMPLETED
+  CERTIFIED
+  DEACTIVATED
+}
+
+model Intern {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  application   ShortlistApplication @relation(fields: [applicationId], references: [id])
+  userId        String?  @unique
+  user          User?    @relation("InternUser", fields: [userId], references: [id])
+
+  dob               DateTime?
+  gender            Gender?
+  mobile            String?
+  address           String?
+  email             String?
+  universityName    String?
+  universityContact String?
+  studentId         String?
+  gpa               Float?
+  major             String?
+  yearOfStudy       String?
+  nationalityId     String?
+  nationality       Nationality? @relation(fields: [nationalityId], references: [id])
+
+  doj              DateTime?
+  dojRemarks       String?
+  durationMonths   Int?
+  departmentId     String
+  department       Department @relation(fields: [departmentId], references: [id])
+  hodUserId        String?
+  hod              User?      @relation("InternHod", fields: [hodUserId], references: [id])
+  mentorUserId     String?
+  mentor           User?      @relation("InternMentor", fields: [mentorUserId], references: [id])
+  projectName      String?
+
+  status    InternStatus @default(REGISTERED)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  questionnaire         QuestionnaireResponse?
+  statusHistory          InternStatusHistory[]
+  goals                   Goal[]
+  timesheets               Timesheet[]
+  meetings                  Meeting[]
+  biweeklyReviews            BiweeklyReview[]
+  finalRemark                  FinalRemark?
+  postInternshipFeedback         PostInternshipFeedback?
+  certificate                      Certificate?
+  files                              FileAsset[]         @relation("InternFiles")
+}
+
+model InternStatusHistory {
+  id            String   @id @default(cuid())
+  internId      String
+  intern        Intern   @relation(fields: [internId], references: [id])
+  fromStatus    String?
+  toStatus      String
+  changedByUserId String?
+  changedBy     User?    @relation("StatusChangedBy", fields: [changedByUserId], references: [id])
+  notes         String?
+  changedAt     DateTime @default(now())
+}
+
+model QuestionnaireResponse {
+  id           String   @id @default(cuid())
+  internId     String   @unique
+  intern       Intern   @relation(fields: [internId], references: [id])
+  responsesJson String  // serialized Q&A
+  submittedAt  DateTime @default(now())
+}
+
+// ============================================================
+// Goals / tasks / timesheets
+// ============================================================
+
+model Goal {
+  id                 String   @id @default(cuid())
+  internId           String
+  intern             Intern   @relation(fields: [internId], references: [id])
+  goalType           String
+  title              String
+  targetDate         DateTime?
+  supervisorComments String?
+  status             String   @default("OPEN")
+  createdAt          DateTime @default(now())
+
+  tasks Task[]
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id])
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+
+  timesheets Timesheet[]
+}
+
+model Timesheet {
+  id          String   @id @default(cuid())
+  internId    String
+  intern      Intern   @relation(fields: [internId], references: [id])
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id])
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  totalHours  Float?
+  progressPct Int?     @default(0)
+  remarks     String?
+  isLocked    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// Meetings / reviews / remarks / feedback
+// ============================================================
+
+enum MeetingType {
+  GOAL_SETTING
+  MID_INTERNSHIP
+}
+
+model Meeting {
+  id            String      @id @default(cuid())
+  internId      String
+  intern        Intern      @relation(fields: [internId], references: [id])
+  type          MeetingType
+  dueDate       DateTime?
+  completedAt   DateTime?
+  isOverdue     Boolean     @default(false)
+  hodNotifiedAt DateTime?
+}
+
+enum RatingValue {
+  EXCELLENT
+  AVERAGE
+  POOR
+}
+
+model BiweeklyReview {
+  id                 String   @id @default(cuid())
+  internId           String
+  intern             Intern   @relation(fields: [internId], references: [id])
+  supervisorId       String
+  supervisor         User     @relation("ReviewBySupervisor", fields: [supervisorId], references: [id])
+  periodStart        DateTime
+  periodEnd          DateTime
+  categoryRatingsJson String  // [{category, rating, comment}]
+  consolidatedRating Float?
+  createdAt          DateTime @default(now())
+}
+
+model FinalRemark {
+  id                 String   @id @default(cuid())
+  internId           String   @unique
+  intern             Intern   @relation(fields: [internId], references: [id])
+  supervisorId       String
+  supervisor         User     @relation("RemarkBySupervisor", fields: [supervisorId], references: [id])
+  softSkillsScore    Int      // 1-5, scale unconfirmed with client
+  technicalSkillsScore Int    // 1-5, scale unconfirmed with client
+  hireRecommended    Boolean  @default(false)
+  comments           String?
+  createdAt          DateTime @default(now())
+}
+
+model PostInternshipFeedback {
+  id            String   @id @default(cuid())
+  internId      String   @unique
+  intern        Intern   @relation(fields: [internId], references: [id])
+  responsesJson String
+  submittedAt   DateTime @default(now())
+}
+
+model Certificate {
+  id                     String   @id @default(cuid())
+  internId               String   @unique
+  intern                 Intern   @relation(fields: [internId], references: [id])
+  certifiedByUserId      String
+  certifiedBy            User     @relation("CertifiedByHr", fields: [certifiedByUserId], references: [id])
+  certifiedAt            DateTime @default(now())
+  hodScorecardReviewedAt DateTime?
+  fileUrl                String?
+}
+
+// ============================================================
+// Training resources / files / notifications
+// ============================================================
+
+enum ResourceType {
+  DOCUMENT
+  AUDIO
+  VIDEO
+}
+
+model TrainingResource {
+  id           String       @id @default(cuid())
+  departmentId String
+  department   Department   @relation(fields: [departmentId], references: [id])
+  title        String
+  type         ResourceType
+  fileId       String
+  file         FileAsset    @relation(fields: [fileId], references: [id])
+  uploadedById String
+  uploadedBy   User         @relation("ResourceUploadedBy", fields: [uploadedById], references: [id])
+  createdAt    DateTime     @default(now())
+}
+
+model FileAsset {
+  id           String   @id @default(cuid())
+  storageKey   String
+  originalName String
+  mimeType     String
+  size         Int
+  uploadedById String
+  uploadedBy   User     @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+  internId     String?
+  intern       Intern?  @relation("InternFiles", fields: [internId], references: [id])
+  createdAt    DateTime @default(now())
+
+  shortlistApplications ShortlistApplication[]
+  trainingResources     TrainingResource[]
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  IN_APP
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  type       String
+  payloadJson String?
+  channel    NotificationChannel @default(EMAIL)
+  sentAt     DateTime? @default(now())
+  readAt     DateTime?
+}
+
+model EmailNotificationSetting {
+  id        String  @id @default(cuid())
+  eventKey  String  @unique
+  isEnabled Boolean @default(true)
+  template  String?
+}
