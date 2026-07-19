@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isProfileComplete } from "@/lib/internProgress";
 import { InternDashboardClient } from "./InternDashboardClient";
 
 export default async function InternDashboardPage() {
@@ -53,8 +54,12 @@ export default async function InternDashboardPage() {
   ];
 
   // Onboarding checklist — drives the "Continue your journey" progress ring.
-  const profileComplete = !!(intern.mobile && intern.address && intern.universityName);
-  const checklist = [!!intern.questionnaire, profileComplete, intern.goals.length > 0];
+  // Only counts steps the intern themselves completes (questionnaire + profile).
+  // Goal assignment is excluded: it's done by the mentor, not the intern, so
+  // including it made the ring jump to a nonzero % on first login whenever a
+  // mentor had already assigned a goal, which read as a random/unexplained number.
+  const profileComplete = isProfileComplete(intern);
+  const checklist = [!!intern.questionnaire, profileComplete];
   const completedSteps = checklist.filter(Boolean).length;
   const progressPct = Math.round((completedSteps / checklist.length) * 100);
 
@@ -62,9 +67,7 @@ export default async function InternDashboardPage() {
     ? { labelKey: "nav.questionnaire" as const, href: "/intern/questionnaire" }
     : !profileComplete
       ? { labelKey: "nav.profile" as const, href: "/intern/profile" }
-      : intern.goals.length === 0
-        ? null
-        : null;
+      : null;
 
   const activity = intern.statusHistory.map((h) => ({
     id: h.id,

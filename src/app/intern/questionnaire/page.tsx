@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isProfileComplete } from "@/lib/internProgress";
 import { QuestionnaireClient } from "./QuestionnaireClient";
 
 export default async function QuestionnairePage() {
@@ -18,5 +19,5 @@ export default async function QuestionnairePage() {
     }
   }
 
-  return <QuestionnaireClient existing={existing} />;
+  return <QuestionnaireClient existing={existing} profileComplete={intern ? isProfileComplete(intern) : false} />;
 }

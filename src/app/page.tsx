@@ -7,7 +7,7 @@ const ROLE_HOME: Record<string, string> = {
   MENTOR: "/mentor/dashboard",
   INTERN: "/intern/dashboard",
   CEO: "/ceo/dashboard",
-  SUPER_ADMIN: "/admin/users",
+  SUPER_ADMIN: "/admin/dashboard",
 };
 
 export default async function Home() {

@@ -13,31 +13,26 @@ async function requireMentor() {
   return session.user;
 }
 
-export async function addGoalWithTask(
-  internId: string,
-  goalType: string,
-  taskName: string,
-  targetDate: string | null,
-  remarks: string
-) {
+export async function addGoal(internId: string, goalType: string, goalName: string, targetDate: string | null, remarks: string) {
   await requireMentor();
 
-  const goal = await prisma.goal.create({
-    data: {
-      intern: { connect: { id: internId } },
-      goalType,
-      title: taskName,
-      targetDate: targetDate ? new Date(targetDate) : null,
-      supervisorComments: remarks || null,
-      status: "OPEN",
-    },
-  });
-  await prisma.task.create({
-    data: { goal: { connect: { id: goal.id } }, name: taskName },
-  });
+  await prisma.$transaction([
+    prisma.goal.create({
+      data: {
+        intern: { connect: { id: internId } },
+        goalType,
+        title: goalName,
+        targetDate: targetDate ? new Date(targetDate) : null,
+        supervisorComments: remarks || null,
+        status: "OPEN",
+      },
+    }),
+    prisma.intern.update({ where: { id: internId }, data: { projectName: goalName } }),
+  ]);
 
   revalidatePath("/mentor/goals");
   revalidatePath("/mentor/dashboard");
+  revalidatePath("/intern/dashboard");
 }
 
 async function requireOwnedGoal(goalId: string, mentorId: string) {

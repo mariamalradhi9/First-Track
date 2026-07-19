@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { InitialsAvatar } from "@/components/InitialsAvatar";
 import { useToast } from "@/components/ui/Toast";
@@ -18,6 +19,9 @@ interface Props {
   universityName: string | null;
   studentId: string | null;
   gpa: number | null;
+  dob: string | null;
+  doj: string | null;
+  dojRemarks: string | null;
 }
 
 export function ProfileClient(props: Props) {
@@ -28,11 +32,23 @@ export function ProfileClient(props: Props) {
   const [universityName, setUniversityName] = useState(props.universityName ?? "");
   const [studentId, setStudentId] = useState(props.studentId ?? "");
   const [gpa, setGpa] = useState(props.gpa?.toString() ?? "");
+  const [dob, setDob] = useState(props.dob ?? "");
+  const [doj, setDoj] = useState(props.doj ?? "");
+  const [dojRemarks, setDojRemarks] = useState(props.dojRemarks ?? "");
   const [pending, startTransition] = useTransition();
 
   function handleSave() {
     startTransition(async () => {
-      await updateProfile({ mobile, address, universityName, studentId, gpa: gpa ? Number(gpa) : undefined });
+      await updateProfile({
+        mobile,
+        address,
+        universityName,
+        studentId,
+        gpa: gpa ? Number(gpa) : undefined,
+        dob: dob || undefined,
+        doj: doj || undefined,
+        dojRemarks,
+      });
       push("Profile updated.", "success");
     });
   }
@@ -69,6 +85,16 @@ export function ProfileClient(props: Props) {
           <Input label={t("common.university")} value={universityName} onChange={(e) => setUniversityName(e.target.value)} />
           <Input label="Student ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} />
           <Input label="GPA" type="number" step="0.01" min="0" max="4" value={gpa} onChange={(e) => setGpa(e.target.value)} />
+          <Input label={t("intern.profile.dob")} type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+          <Input label={t("intern.profile.doj")} type="date" value={doj} onChange={(e) => setDoj(e.target.value)} />
+        </div>
+        <div className="mt-4">
+          <Textarea
+            label={t("intern.profile.dojRemarks")}
+            value={dojRemarks}
+            onChange={(e) => setDojRemarks(e.target.value)}
+            rows={2}
+          />
         </div>
 
         <Button className="mt-6" loading={pending} onClick={handleSave}>

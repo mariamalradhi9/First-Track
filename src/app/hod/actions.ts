@@ -88,13 +88,12 @@ export async function decideShortlistApplication(
   return credentials;
 }
 
-export async function assignProjectMentor(internId: string, projectName: string, mentorUserId: string) {
+export async function assignProjectMentor(internId: string, mentorUserId: string) {
   await requireHod();
 
   await prisma.intern.update({
     where: { id: internId },
     data: {
-      projectName,
       mentor: { connect: { id: mentorUserId } },
       status: InternStatus.ACTIVE,
     },

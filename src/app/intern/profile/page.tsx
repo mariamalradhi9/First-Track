@@ -23,6 +23,9 @@ export default async function ProfilePage() {
       universityName={intern.universityName}
       studentId={intern.studentId}
       gpa={intern.gpa}
+      dob={intern.dob?.toISOString().slice(0, 10) ?? null}
+      doj={intern.doj?.toISOString().slice(0, 10) ?? null}
+      dojRemarks={intern.dojRemarks}
     />
   );
 }

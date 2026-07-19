@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { InitialsAvatar } from "@/components/InitialsAvatar";
 import { useToast } from "@/components/ui/Toast";
 import { useT } from "@/lib/i18n";
-import { addGoalWithTask } from "../actions";
+import { addGoal } from "../actions";
 
 interface Row {
   id: string;
@@ -29,19 +29,19 @@ export function GoalsClient({ rows: initialRows }: { rows: Row[] }) {
   const [rows, setRows] = useState(initialRows);
   const [target, setTarget] = useState<Row | null>(null);
   const [goalType, setGoalType] = useState(GOAL_TYPES[0]);
-  const [taskName, setTaskName] = useState("");
+  const [goalName, setGoalName] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [remarks, setRemarks] = useState("");
   const [pending, startTransition] = useTransition();
 
   function handleAdd() {
-    if (!target || !taskName) return;
+    if (!target || !goalName) return;
     startTransition(async () => {
-      await addGoalWithTask(target.id, goalType, taskName, targetDate || null, remarks);
-      setRows((rs) => rs.map((r) => (r.id === target.id ? { ...r, goalCount: r.goalCount + 1 } : r)));
+      await addGoal(target.id, goalType, goalName, targetDate || null, remarks);
+      setRows((rs) => rs.map((r) => (r.id === target.id ? { ...r, goalCount: r.goalCount + 1, projectName: goalName } : r)));
       push(`Goal added for ${target.name}.`, "success");
       setTarget(null);
-      setTaskName("");
+      setGoalName("");
       setTargetDate("");
       setRemarks("");
     });
@@ -105,7 +105,7 @@ export function GoalsClient({ rows: initialRows }: { rows: Row[] }) {
             <Button variant="secondary" onClick={() => setTarget(null)}>
               {t("common.cancel")}
             </Button>
-            <Button loading={pending} disabled={!taskName} onClick={handleAdd}>
+            <Button loading={pending} disabled={!goalName} onClick={handleAdd}>
               {t("common.create")}
             </Button>
           </>
@@ -119,7 +119,7 @@ export function GoalsClient({ rows: initialRows }: { rows: Row[] }) {
               </option>
             ))}
           </Select>
-          <Input label={t("mentor.goals.taskName")} value={taskName} onChange={(e) => setTaskName(e.target.value)} />
+          <Input label={t("mentor.goals.goalName")} value={goalName} onChange={(e) => setGoalName(e.target.value)} />
           <Input label={t("mentor.goals.targetDate")} type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
           <Textarea label={t("common.remarks")} value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} />
         </div>

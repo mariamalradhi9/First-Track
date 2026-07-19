@@ -53,10 +53,22 @@ export async function updateProfile(fields: {
   universityName?: string;
   studentId?: string;
   gpa?: number;
+  dob?: string;
+  doj?: string;
+  dojRemarks?: string;
 }) {
   const intern = await requireInternRecord();
-  await prisma.intern.update({ where: { id: intern.id }, data: fields });
+  const { dob, doj, ...rest } = fields;
+  await prisma.intern.update({
+    where: { id: intern.id },
+    data: {
+      ...rest,
+      dob: dob ? new Date(dob) : undefined,
+      doj: doj ? new Date(doj) : undefined,
+    },
+  });
   revalidatePath("/intern/profile");
+  revalidatePath("/intern/dashboard");
 }
 
 export async function submitTimesheet(

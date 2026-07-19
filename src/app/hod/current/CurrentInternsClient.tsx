@@ -37,7 +37,6 @@ export function CurrentInternsClient({ rows: initialRows, mentors }: { rows: Row
   const [rows, setRows] = useState(initialRows);
   const [tab, setTab] = useState<Tab>("ALL");
   const [target, setTarget] = useState<Row | null>(null);
-  const [projectName, setProjectName] = useState("");
   const [mentorId, setMentorId] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -57,17 +56,16 @@ export function CurrentInternsClient({ rows: initialRows, mentors }: { rows: Row
 
   function openAssign(row: Row) {
     setTarget(row);
-    setProjectName(row.projectName ?? "");
     setMentorId(row.mentorId ?? "");
   }
 
   function handleAssign() {
-    if (!target || !projectName || !mentorId) return;
+    if (!target || !mentorId) return;
     startTransition(async () => {
-      await assignProjectMentor(target.id, projectName, mentorId);
+      await assignProjectMentor(target.id, mentorId);
       const mentorName = mentors.find((m) => m.id === mentorId)?.name ?? null;
-      setRows((rs) => rs.map((r) => (r.id === target.id ? { ...r, projectName, mentorId, mentor: mentorName, status: "ACTIVE" } : r)));
-      push(`${target.name} — project and mentor assigned.`, "success");
+      setRows((rs) => rs.map((r) => (r.id === target.id ? { ...r, mentorId, mentor: mentorName, status: "ACTIVE" } : r)));
+      push(`${target.name} — mentor assigned.`, "success");
       setTarget(null);
     });
   }
@@ -163,14 +161,13 @@ export function CurrentInternsClient({ rows: initialRows, mentors }: { rows: Row
             <Button variant="secondary" onClick={() => setTarget(null)}>
               {t("common.cancel")}
             </Button>
-            <Button loading={pending} disabled={!projectName || !mentorId} onClick={handleAssign}>
+            <Button loading={pending} disabled={!mentorId} onClick={handleAssign}>
               {t("common.assign")}
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <Input label={t("common.project")} value={projectName} onChange={(e) => setProjectName(e.target.value)} />
           <Select label={t("common.mentor")} value={mentorId} onChange={(e) => setMentorId(e.target.value)}>
             <option value="" disabled>
               {t("common.mentor")}
