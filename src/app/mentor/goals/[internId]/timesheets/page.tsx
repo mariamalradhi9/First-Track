@@ -7,11 +7,18 @@ export default async function TimesheetsPage({ params }: { params: Promise<{ int
   const intern = await prisma.intern.findUnique({ where: { id: internId }, include: { user: true } });
   if (!intern) notFound();
 
-  const timesheets = await prisma.timesheet.findMany({
-    where: { internId },
-    include: { task: true },
-    orderBy: { date: "desc" },
-  });
+  const [timesheets, tasks] = await Promise.all([
+    prisma.timesheet.findMany({
+      where: { internId },
+      include: { task: true },
+      orderBy: { date: "desc" },
+    }),
+    prisma.task.findMany({
+      where: { goal: { internId }, submissionStatus: { not: "NOT_SUBMITTED" } },
+      include: { goal: true },
+      orderBy: { submittedAt: "desc" },
+    }),
+  ]);
 
   const rows = timesheets.map((ts) => ({
     id: ts.id,
@@ -23,5 +30,15 @@ export default async function TimesheetsPage({ params }: { params: Promise<{ int
     task: ts.task?.name ?? "General",
   }));
 
-  return <TimesheetsClient name={intern.user?.name ?? "Timesheets"} rows={rows} />;
+  const submissions = tasks.map((task) => ({
+    id: task.id,
+    goalTitle: task.goal.title,
+    taskName: task.name,
+    submittedAt: task.submittedAt?.toISOString() ?? null,
+    reviewedAt: task.reviewedAt?.toISOString() ?? null,
+    status: task.submissionStatus,
+    progressPct: task.progressPct,
+  }));
+
+  return <TimesheetsClient name={intern.user?.name ?? "Timesheets"} rows={rows} submissions={submissions} />;
 }

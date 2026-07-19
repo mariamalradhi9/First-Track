@@ -97,6 +97,14 @@ export async function updateTask(
   revalidatePath("/mentor/goals");
 }
 
+export async function deleteTask(taskId: string) {
+  const user = await requireMentor();
+  const task = await requireOwnedTask(taskId, user.id);
+  await prisma.task.delete({ where: { id: taskId } });
+  revalidatePath(`/mentor/goals/${task.goal.internId}`);
+  revalidatePath("/mentor/goals");
+}
+
 export async function reviewTaskSubmission(
   taskId: string,
   progressPct: number,
@@ -105,8 +113,8 @@ export async function reviewTaskSubmission(
 ) {
   const user = await requireMentor();
   const task = await requireOwnedTask(taskId, user.id);
-  if (task.submissionStatus !== TaskSubmissionStatus.SUBMITTED) {
-    throw new Error("This task has no pending submission to review.");
+  if (task.submissionStatus === TaskSubmissionStatus.NOT_SUBMITTED) {
+    throw new Error("This task has no submission to review.");
   }
 
   await prisma.task.update({

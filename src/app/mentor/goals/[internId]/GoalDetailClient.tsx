@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { InitialsAvatar } from "@/components/InitialsAvatar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useT } from "@/lib/i18n";
-import { addTaskToGoal, updateTask, reviewTaskSubmission } from "../../actions";
+import { addTaskToGoal, updateTask, deleteTask, reviewTaskSubmission } from "../../actions";
 
 type SubmissionStatus = "NOT_SUBMITTED" | "SUBMITTED" | "CHANGES_REQUESTED" | "APPROVED";
 
@@ -63,6 +63,7 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
   const [review, setReview] = useState<ReviewState | null>(null);
   const [pending, startTransition] = useTransition();
   const [reviewPending, startReviewTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function openAdd(goalId: string) {
     setForm({ mode: "add", goalId, name: "", description: "", startDate: "", endDate: "" });
@@ -132,6 +133,18 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
     });
   }
 
+  function handleDelete(goalId: string, taskId: string) {
+    setDeletingId(taskId);
+    startTransition(async () => {
+      await deleteTask(taskId);
+      setGoals((gs) =>
+        gs.map((g) => (g.id === goalId ? { ...g, tasks: g.tasks.filter((tk) => tk.id !== taskId) } : g))
+      );
+      push("Task deleted.", "info");
+      setDeletingId(null);
+    });
+  }
+
   function openReview(goalId: string, task: Task) {
     setReview({
       goalId,
@@ -139,7 +152,7 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
       taskName: task.name,
       submissionLink: task.submissionLink ?? "",
       progressPct: task.progressPct,
-      feedback: "",
+      feedback: task.mentorFeedback ?? "",
     });
   }
 
@@ -234,12 +247,22 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(g.id, task)}>
-                          {t("common.edit")}
-                        </Button>
-                        {task.submissionStatus === "SUBMITTED" && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(g.id, task)}>
+                            {t("common.edit")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            loading={pending && deletingId === task.id}
+                            onClick={() => handleDelete(g.id, task.id)}
+                          >
+                            {t("common.delete")}
+                          </Button>
+                        </div>
+                        {task.submissionStatus !== "NOT_SUBMITTED" && (
                           <Button size="sm" onClick={() => openReview(g.id, task)}>
-                            {t("mentor.goals.review")}
+                            {task.submissionStatus === "SUBMITTED" ? t("mentor.goals.review") : t("mentor.goals.editReview")}
                           </Button>
                         )}
                       </div>
