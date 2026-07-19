@@ -121,24 +121,40 @@ export async function reviewTaskSubmission(
   const status = decision === "APPROVE" ? TaskSubmissionStatus.APPROVED : TaskSubmissionStatus.CHANGES_REQUESTED;
   const now = new Date();
 
-  const pendingRound = await prisma.taskReview.findFirst({
-    where: { taskId, reviewedAt: null },
+  // Every review action must leave a history entry — including a mentor
+  // re-reviewing an already-decided task (no fresh submission from the
+  // intern), which previously left no "pending" row to attach the update
+  // to and silently dropped the correction from the history log.
+  const lastRound = await prisma.taskReview.findFirst({
+    where: { taskId },
     orderBy: { submittedAt: "desc" },
   });
+
+  const reviewLogUpdate =
+    lastRound && lastRound.reviewedAt === null
+      ? prisma.taskReview.update({
+          where: { id: lastRound.id },
+          data: { reviewedAt: now, progressAdded: progressToAdd, progressTotal: newTotal, status, feedback: feedback || null },
+        })
+      : prisma.taskReview.create({
+          data: {
+            taskId,
+            submissionLink: task.submissionLink ?? "",
+            submittedAt: lastRound?.submittedAt ?? now,
+            reviewedAt: now,
+            progressAdded: progressToAdd,
+            progressTotal: newTotal,
+            status,
+            feedback: feedback || null,
+          },
+        });
 
   await prisma.$transaction([
     prisma.task.update({
       where: { id: taskId },
       data: { progressPct: newTotal, mentorFeedback: feedback || null, reviewedAt: now, submissionStatus: status },
     }),
-    ...(pendingRound
-      ? [
-          prisma.taskReview.update({
-            where: { id: pendingRound.id },
-            data: { reviewedAt: now, progressAdded: progressToAdd, progressTotal: newTotal, status, feedback: feedback || null },
-          }),
-        ]
-      : []),
+    reviewLogUpdate,
   ]);
 
   revalidatePath(`/mentor/goals/${task.goal.internId}`);
