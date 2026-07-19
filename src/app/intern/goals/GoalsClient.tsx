@@ -45,15 +45,10 @@ export function GoalsClient({ rows }: { rows: Row[] }) {
                 <span>{g.taskCount} task{g.taskCount === 1 ? "" : "s"}</span>
                 {g.targetDate && <span>{format(new Date(g.targetDate), "d MMM yyyy")}</span>}
               </div>
-              <div className="mt-1 flex flex-col gap-2">
+              <div className="mt-1 flex justify-center">
                 <Link href={`/intern/goals/${g.id}`}>
-                  <Button size="sm" variant="secondary" className="w-full">
+                  <Button size="sm" variant="secondary">
                     {t("intern.goals.viewTasks")}
-                  </Button>
-                </Link>
-                <Link href={`/intern/goals/${g.id}/timesheet`}>
-                  <Button size="sm" className="w-full">
-                    {t("intern.goals.submitTimesheet")}
                   </Button>
                 </Link>
               </div>

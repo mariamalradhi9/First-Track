@@ -97,9 +97,11 @@ export function ProfileClient(props: Props) {
           />
         </div>
 
-        <Button className="mt-6" loading={pending} onClick={handleSave}>
-          {t("common.save")}
-        </Button>
+        <div className="mt-6 flex justify-center">
+          <Button loading={pending} onClick={handleSave}>
+            {t("common.save")}
+          </Button>
+        </div>
         </div>
       </Card>
     </div>

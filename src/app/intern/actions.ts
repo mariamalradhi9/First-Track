@@ -23,14 +23,16 @@ export async function submitTaskLink(taskId: string, link: string) {
     throw new Error("This task has already been submitted and is awaiting or has completed review.");
   }
 
-  await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      submissionLink: link.trim(),
-      submissionStatus: TaskSubmissionStatus.SUBMITTED,
-      submittedAt: new Date(),
-    },
-  });
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.task.update({
+      where: { id: taskId },
+      data: { submissionLink: link.trim(), submissionStatus: TaskSubmissionStatus.SUBMITTED, submittedAt: now },
+    }),
+    prisma.taskReview.create({
+      data: { taskId, submissionLink: link.trim(), submittedAt: now, status: TaskSubmissionStatus.SUBMITTED },
+    }),
+  ]);
 
   revalidatePath(`/intern/goals/${task.goalId}`);
   revalidatePath("/intern/goals");
@@ -68,40 +70,6 @@ export async function updateProfile(fields: {
     },
   });
   revalidatePath("/intern/profile");
-  revalidatePath("/intern/dashboard");
-}
-
-export async function submitTimesheet(
-  goalId: string,
-  taskId: string | null,
-  date: string,
-  checkIn: string,
-  checkOut: string,
-  progressPct: number,
-  remarks: string
-) {
-  const intern = await requireInternRecord();
-
-  const checkInDate = new Date(`${date}T${checkIn}`);
-  const checkOutDate = new Date(`${date}T${checkOut}`);
-  const totalHours = Math.max(0, (checkOutDate.getTime() - checkInDate.getTime()) / 3_600_000);
-
-  await prisma.timesheet.create({
-    data: {
-      intern: { connect: { id: intern.id } },
-      task: taskId ? { connect: { id: taskId } } : undefined,
-      date: new Date(date),
-      checkIn: checkInDate,
-      checkOut: checkOutDate,
-      totalHours: Number(totalHours.toFixed(2)),
-      progressPct,
-      remarks: remarks || null,
-      isLocked: true,
-    },
-  });
-
-  revalidatePath(`/intern/goals/${goalId}/timesheet`);
-  revalidatePath("/intern/goals");
   revalidatePath("/intern/dashboard");
 }
 

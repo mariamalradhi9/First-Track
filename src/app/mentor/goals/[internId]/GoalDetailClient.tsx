@@ -51,7 +51,8 @@ interface ReviewState {
   taskId: string;
   taskName: string;
   submissionLink: string;
-  progressPct: number;
+  currentTotal: number;
+  progressToAdd: number;
   feedback: string;
 }
 
@@ -151,15 +152,17 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
       taskId: task.id,
       taskName: task.name,
       submissionLink: task.submissionLink ?? "",
-      progressPct: task.progressPct,
+      currentTotal: task.progressPct,
+      progressToAdd: 0,
       feedback: task.mentorFeedback ?? "",
     });
   }
 
   function handleReviewSubmit(decision: "APPROVE" | "REQUEST_CHANGES") {
     if (!review) return;
+    const newTotal = Math.min(100, Math.max(0, review.currentTotal + review.progressToAdd));
     startReviewTransition(async () => {
-      await reviewTaskSubmission(review.taskId, review.progressPct, review.feedback, decision);
+      await reviewTaskSubmission(review.taskId, review.progressToAdd, review.feedback, decision);
       setGoals((gs) =>
         gs.map((g) =>
           g.id === review.goalId
@@ -169,7 +172,7 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                   tk.id === review.taskId
                     ? {
                         ...tk,
-                        progressPct: review.progressPct,
+                        progressPct: newTotal,
                         mentorFeedback: review.feedback || null,
                         submissionStatus: decision === "APPROVE" ? "APPROVED" : "CHANGES_REQUESTED",
                       }
@@ -358,14 +361,20 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                 {review.submissionLink}
               </a>
             </div>
+            <p className="text-[13px] text-text-2">
+              {t("mentor.goals.currentProgress")}: <span className="font-semibold text-text">{review.currentTotal}%</span>
+            </p>
             <Input
-              label={t("intern.goals.progressPct")}
+              label={t("mentor.goals.addProgress")}
               type="number"
-              min={0}
-              max={100}
-              value={review.progressPct}
-              onChange={(e) => setReview({ ...review, progressPct: Number(e.target.value) })}
+              min={-review.currentTotal}
+              max={100 - review.currentTotal}
+              value={review.progressToAdd}
+              onChange={(e) => setReview({ ...review, progressToAdd: Number(e.target.value) })}
             />
+            <p className="text-[12.5px] text-text-3">
+              {t("mentor.goals.newTotal")}: {Math.min(100, Math.max(0, review.currentTotal + review.progressToAdd))}%
+            </p>
             <Textarea
               label={t("mentor.goals.feedback")}
               value={review.feedback}

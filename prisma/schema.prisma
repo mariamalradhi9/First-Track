@@ -249,6 +249,23 @@ model Task {
   reviewedAt       DateTime?
 
   timesheets Timesheet[]
+  reviews    TaskReview[]
+}
+
+// One row per submit+review round for a Task, so the full history of
+// submissions and evaluations is visible (progress is cumulative across
+// rounds, so each round only records how much it added).
+model TaskReview {
+  id             String    @id @default(cuid())
+  taskId         String
+  task           Task      @relation(fields: [taskId], references: [id])
+  submissionLink String
+  submittedAt    DateTime  @default(now())
+  reviewedAt     DateTime?
+  progressAdded  Int?
+  progressTotal  Int?
+  status         TaskSubmissionStatus @default(SUBMITTED)
+  feedback       String?
 }
 
 model Timesheet {

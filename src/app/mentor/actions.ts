@@ -107,7 +107,7 @@ export async function deleteTask(taskId: string) {
 
 export async function reviewTaskSubmission(
   taskId: string,
-  progressPct: number,
+  progressToAdd: number,
   feedback: string,
   decision: "APPROVE" | "REQUEST_CHANGES"
 ) {
@@ -117,15 +117,29 @@ export async function reviewTaskSubmission(
     throw new Error("This task has no submission to review.");
   }
 
-  await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      progressPct: Math.min(100, Math.max(0, progressPct)),
-      mentorFeedback: feedback || null,
-      reviewedAt: new Date(),
-      submissionStatus: decision === "APPROVE" ? TaskSubmissionStatus.APPROVED : TaskSubmissionStatus.CHANGES_REQUESTED,
-    },
+  const newTotal = Math.min(100, Math.max(0, task.progressPct + progressToAdd));
+  const status = decision === "APPROVE" ? TaskSubmissionStatus.APPROVED : TaskSubmissionStatus.CHANGES_REQUESTED;
+  const now = new Date();
+
+  const pendingRound = await prisma.taskReview.findFirst({
+    where: { taskId, reviewedAt: null },
+    orderBy: { submittedAt: "desc" },
   });
+
+  await prisma.$transaction([
+    prisma.task.update({
+      where: { id: taskId },
+      data: { progressPct: newTotal, mentorFeedback: feedback || null, reviewedAt: now, submissionStatus: status },
+    }),
+    ...(pendingRound
+      ? [
+          prisma.taskReview.update({
+            where: { id: pendingRound.id },
+            data: { reviewedAt: now, progressAdded: progressToAdd, progressTotal: newTotal, status, feedback: feedback || null },
+          }),
+        ]
+      : []),
+  ]);
 
   revalidatePath(`/mentor/goals/${task.goal.internId}`);
   revalidatePath("/mentor/goals");
