@@ -29,6 +29,10 @@ export const STATUS_TONE_MAP: Record<string, StatusTone> = {
   COMPLETED: "pending",
   CERTIFIED: "approved",
   DEACTIVATED: "neutral",
+  NOT_SUBMITTED: "neutral",
+  SUBMITTED: "inprogress",
+  CHANGES_REQUESTED: "rejected",
+  APPROVED: "approved",
 };
 
 interface Props {

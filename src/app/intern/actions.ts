@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { TaskSubmissionStatus } from "@prisma/client";
 
 async function requireInternRecord() {
   const session = await auth();
@@ -10,6 +11,29 @@ async function requireInternRecord() {
   const intern = await prisma.intern.findUnique({ where: { userId: session.user.id } });
   if (!intern) throw new Error("No intern profile found for this account.");
   return intern;
+}
+
+export async function submitTaskLink(taskId: string, link: string) {
+  const intern = await requireInternRecord();
+  if (!link.trim()) throw new Error("Please enter a link to your work.");
+
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: { goal: true } });
+  if (!task || task.goal.internId !== intern.id) throw new Error("Not found.");
+  if (task.submissionStatus !== TaskSubmissionStatus.NOT_SUBMITTED && task.submissionStatus !== TaskSubmissionStatus.CHANGES_REQUESTED) {
+    throw new Error("This task has already been submitted and is awaiting or has completed review.");
+  }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      submissionLink: link.trim(),
+      submissionStatus: TaskSubmissionStatus.SUBMITTED,
+      submittedAt: new Date(),
+    },
+  });
+
+  revalidatePath(`/intern/goals/${task.goalId}`);
+  revalidatePath("/intern/goals");
 }
 
 export async function submitQuestionnaire(responses: Record<string, string>) {

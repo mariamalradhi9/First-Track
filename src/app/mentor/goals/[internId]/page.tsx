@@ -31,6 +31,11 @@ export default async function MentorGoalDetailPage({ params }: { params: Promise
       description: t.description,
       startDate: t.startDate?.toISOString() ?? null,
       endDate: t.endDate?.toISOString() ?? null,
+      submissionLink: t.submissionLink,
+      submissionStatus: t.submissionStatus,
+      submittedAt: t.submittedAt?.toISOString() ?? null,
+      progressPct: t.progressPct,
+      mentorFeedback: t.mentorFeedback,
     })),
   }));
 

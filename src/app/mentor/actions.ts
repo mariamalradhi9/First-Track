@@ -5,7 +5,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { InternStatus, ResourceType, type RatingValue } from "@prisma/client";
+import { InternStatus, ResourceType, TaskSubmissionStatus, type RatingValue } from "@prisma/client";
 
 async function requireMentor() {
   const session = await auth();
@@ -95,6 +95,32 @@ export async function updateTask(
       description: description || null,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
+    },
+  });
+
+  revalidatePath(`/mentor/goals/${task.goal.internId}`);
+  revalidatePath("/mentor/goals");
+}
+
+export async function reviewTaskSubmission(
+  taskId: string,
+  progressPct: number,
+  feedback: string,
+  decision: "APPROVE" | "REQUEST_CHANGES"
+) {
+  const user = await requireMentor();
+  const task = await requireOwnedTask(taskId, user.id);
+  if (task.submissionStatus !== TaskSubmissionStatus.SUBMITTED) {
+    throw new Error("This task has no pending submission to review.");
+  }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      progressPct: Math.min(100, Math.max(0, progressPct)),
+      mentorFeedback: feedback || null,
+      reviewedAt: new Date(),
+      submissionStatus: decision === "APPROVE" ? TaskSubmissionStatus.APPROVED : TaskSubmissionStatus.CHANGES_REQUESTED,
     },
   });
 

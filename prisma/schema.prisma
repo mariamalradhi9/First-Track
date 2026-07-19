@@ -224,6 +224,13 @@ model Goal {
   tasks Task[]
 }
 
+enum TaskSubmissionStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+}
+
 model Task {
   id          String   @id @default(cuid())
   goalId      String
@@ -233,6 +240,13 @@ model Task {
   startDate   DateTime?
   endDate     DateTime?
   createdAt   DateTime @default(now())
+
+  submissionLink   String?
+  submissionStatus TaskSubmissionStatus @default(NOT_SUBMITTED)
+  submittedAt      DateTime?
+  progressPct      Int                  @default(0)
+  mentorFeedback   String?
+  reviewedAt       DateTime?
 
   timesheets Timesheet[]
 }

@@ -10,8 +10,11 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import { InitialsAvatar } from "@/components/InitialsAvatar";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useT } from "@/lib/i18n";
-import { addTaskToGoal, updateTask } from "../../actions";
+import { addTaskToGoal, updateTask, reviewTaskSubmission } from "../../actions";
+
+type SubmissionStatus = "NOT_SUBMITTED" | "SUBMITTED" | "CHANGES_REQUESTED" | "APPROVED";
 
 interface Task {
   id: string;
@@ -19,6 +22,11 @@ interface Task {
   description: string | null;
   startDate: string | null;
   endDate: string | null;
+  submissionLink: string | null;
+  submissionStatus: SubmissionStatus;
+  submittedAt: string | null;
+  progressPct: number;
+  mentorFeedback: string | null;
 }
 interface Goal {
   id: string;
@@ -38,12 +46,23 @@ interface FormState {
   endDate: string;
 }
 
+interface ReviewState {
+  goalId: string;
+  taskId: string;
+  taskName: string;
+  submissionLink: string;
+  progressPct: number;
+  feedback: string;
+}
+
 export function GoalDetailClient({ internName, goals: initialGoals }: { internName: string; goals: Goal[] }) {
   const t = useT();
   const { push } = useToast();
   const [goals, setGoals] = useState(initialGoals);
   const [form, setForm] = useState<FormState | null>(null);
+  const [review, setReview] = useState<ReviewState | null>(null);
   const [pending, startTransition] = useTransition();
+  const [reviewPending, startReviewTransition] = useTransition();
 
   function openAdd(goalId: string) {
     setForm({ mode: "add", goalId, name: "", description: "", startDate: "", endDate: "" });
@@ -79,6 +98,11 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                       description: form.description || null,
                       startDate: form.startDate || null,
                       endDate: form.endDate || null,
+                      submissionLink: null,
+                      submissionStatus: "NOT_SUBMITTED",
+                      submittedAt: null,
+                      progressPct: 0,
+                      mentorFeedback: null,
                     },
                   ],
                 }
@@ -105,6 +129,45 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
         push("Task updated.", "success");
       }
       setForm(null);
+    });
+  }
+
+  function openReview(goalId: string, task: Task) {
+    setReview({
+      goalId,
+      taskId: task.id,
+      taskName: task.name,
+      submissionLink: task.submissionLink ?? "",
+      progressPct: task.progressPct,
+      feedback: "",
+    });
+  }
+
+  function handleReviewSubmit(decision: "APPROVE" | "REQUEST_CHANGES") {
+    if (!review) return;
+    startReviewTransition(async () => {
+      await reviewTaskSubmission(review.taskId, review.progressPct, review.feedback, decision);
+      setGoals((gs) =>
+        gs.map((g) =>
+          g.id === review.goalId
+            ? {
+                ...g,
+                tasks: g.tasks.map((tk) =>
+                  tk.id === review.taskId
+                    ? {
+                        ...tk,
+                        progressPct: review.progressPct,
+                        mentorFeedback: review.feedback || null,
+                        submissionStatus: decision === "APPROVE" ? "APPROVED" : "CHANGES_REQUESTED",
+                      }
+                    : tk
+                ),
+              }
+            : g
+        )
+      );
+      push(decision === "APPROVE" ? "Task approved." : "Changes requested.", "success");
+      setReview(null);
     });
   }
 
@@ -143,7 +206,11 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                   {g.tasks.map((task) => (
                     <div key={task.id} className="py-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[13.5px] font-medium text-text">{task.name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-[13.5px] font-medium text-text">{task.name}</p>
+                          <StatusBadge status={task.submissionStatus}>{task.submissionStatus.replace("_", " ")}</StatusBadge>
+                          <span className="text-[11.5px] text-text-3">{task.progressPct}%</span>
+                        </div>
                         {task.description && <p className="mt-0.5 text-[12.5px] text-text-2">{task.description}</p>}
                         {(task.startDate || task.endDate) && (
                           <p className="mt-0.5 text-[11.5px] text-text-3">
@@ -152,10 +219,30 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                             {task.endDate ? format(new Date(task.endDate), "d MMM yyyy") : "—"}
                           </p>
                         )}
+                        {task.submissionLink && (
+                          <a
+                            href={task.submissionLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-block text-[12.5px] text-wine underline break-all"
+                          >
+                            {task.submissionLink}
+                          </a>
+                        )}
+                        {task.mentorFeedback && (
+                          <p className="mt-1 text-[12px] text-text-2">{t("mentor.goals.feedback")}: {task.mentorFeedback}</p>
+                        )}
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(g.id, task)}>
-                        {t("common.edit")}
-                      </Button>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(g.id, task)}>
+                          {t("common.edit")}
+                        </Button>
+                        {task.submissionStatus === "SUBMITTED" && (
+                          <Button size="sm" onClick={() => openReview(g.id, task)}>
+                            {t("mentor.goals.review")}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -207,6 +294,61 @@ export function GoalDetailClient({ internName, goals: initialGoals }: { internNa
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               />
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!review}
+        onClose={() => setReview(null)}
+        title={`${t("mentor.goals.review")} — ${review?.taskName ?? ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReview(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              loading={reviewPending}
+              onClick={() => handleReviewSubmit("REQUEST_CHANGES")}
+            >
+              {t("mentor.goals.requestChanges")}
+            </Button>
+            <Button loading={reviewPending} onClick={() => handleReviewSubmit("APPROVE")}>
+              {t("mentor.goals.approve")}
+            </Button>
+          </>
+        }
+      >
+        {review && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.6px] text-text-3 mb-1">
+                {t("mentor.goals.submissionLink")}
+              </p>
+              <a
+                href={review.submissionLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[13px] text-wine underline break-all"
+              >
+                {review.submissionLink}
+              </a>
+            </div>
+            <Input
+              label={t("intern.goals.progressPct")}
+              type="number"
+              min={0}
+              max={100}
+              value={review.progressPct}
+              onChange={(e) => setReview({ ...review, progressPct: Number(e.target.value) })}
+            />
+            <Textarea
+              label={t("mentor.goals.feedback")}
+              value={review.feedback}
+              onChange={(e) => setReview({ ...review, feedback: e.target.value })}
+              rows={3}
+            />
           </div>
         )}
       </Modal>
